@@ -1,7 +1,6 @@
 # Gunakan Node.js versi ringan sebagai base image
 FROM node:20-alpine
 
-# Set direktori kerja di dalam container
 WORKDIR /app
 
 # Salin package.json dan package-lock.json (jika ada)
