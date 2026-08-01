@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: portofolio-frontend
+    ports:
+      - "80:80" # Akses web dari port 80 (default HTTP)
+    volumes:
+      # Mount semua file statik (index.html, gambar, cv) ke Nginx
+      - .:/usr/share/nginx/html
+      # Mount konfigurasi custom Nginx
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    build: .
+    container_name: portofolio-backend
+    env_file:
+      - .env
+    ports:
+      - "3001:3001" # Port backend API
+    restart: always
