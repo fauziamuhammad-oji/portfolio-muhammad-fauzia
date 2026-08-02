@@ -2136,23 +2136,31 @@
                         body: JSON.stringify({ message: msgText, isFirstMessage })
                     });
 
-                    const data = await response.json();
+                    // Ambil sebagai teks dulu, baru parse JSON — mencegah error parse kalau server kirim HTML
+                    const rawText = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(rawText);
+                    } catch (parseError) {
+                        throw new Error('Server tidak dapat dijangkau atau sedang offline. Coba beberapa saat lagi.');
+                    }
+
                     chatbotTyping.style.display = 'none';
 
                     if(data.success) {
                         addMessage(data.reply.replace(/\*\*/g, ''), 'chat-ai');
                         isFirstMessage = false;
                     } else {
-                        throw new Error(data.message || 'Error dari server');
+                        throw new Error(data.message || 'Terjadi kesalahan pada server.');
                     }
                 } catch(error) {
                     chatbotTyping.style.display = 'none';
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'chat-msg chat-ai';
                     errorDiv.style.color = '#c86b4d';
-                    errorDiv.textContent = error.message || "Maaf, API Key Gemini belum diatur atau server offline.";
+                    errorDiv.textContent = error.message || "Maaf, server sedang offline. Silakan coba lagi nanti.";
                     chatbotMessages.insertBefore(errorDiv, chatbotTyping);
-                    console.error(error);
+                    console.error('Chatbot error:', error);
                 }
                 
                 chatbotMessages.scrollTop = chatbotMessages.scrollHeight;

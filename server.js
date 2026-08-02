@@ -17,17 +17,6 @@ app.use(cors()); // Izinkan Akses CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Error handler untuk payload JSON tidak valid
-app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        return res.status(400).json({
-            success: false,
-            message: 'Request JSON tidak valid.'
-        });
-    }
-    next(err);
-});
-
 // Helper untuk mendapatkan Transporter Nodemailer
 const getTransporter = () => {
     const emailUser = process.env.EMAIL_USER;
@@ -251,6 +240,30 @@ Pertanyaan Pengunjung:
             message: `Error Gemini: ${error.message}`
         });
     }
+});
+
+// ==========================================
+// Error Handler Middleware (Harus Setelah Semua Routes)
+// ==========================================
+
+// Handler untuk request body JSON tidak valid (SyntaxError dari express.json())
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        return res.status(400).json({
+            success: false,
+            message: 'Request JSON tidak valid.'
+        });
+    }
+    next(err);
+});
+
+// Global error handler — tangkap semua error yang tidak tertangani di routes
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    return res.status(500).json({
+        success: false,
+        message: 'Terjadi kesalahan internal server.'
+    });
 });
 
 // ==========================================
