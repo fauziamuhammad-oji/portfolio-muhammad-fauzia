@@ -168,8 +168,12 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ success: false, message: 'API Key Gemini belum dikonfigurasi di server.' });
+        if (!apiKey || apiKey.startsWith('GANTI_DENGAN')) {
+            console.error('[CHATBOT ERROR] GEMINI_API_KEY tidak ditemukan di environment variables!');
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Fitur AI Chatbot belum aktif. API Key Gemini belum dikonfigurasi di server.' 
+            });
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);

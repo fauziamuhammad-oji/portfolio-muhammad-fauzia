@@ -2081,6 +2081,7 @@
 
             // Buka/Tutup Chat Panel
             let isFirstMessage = true;
+            let apiKeyValid = true; // Flag untuk track status API Key
 
             function getCurrentTime() {
                 const now = new Date();
@@ -2150,15 +2151,37 @@
                     if(data.success) {
                         addMessage(data.reply.replace(/\*\*/g, ''), 'chat-ai');
                         isFirstMessage = false;
+                        apiKeyValid = true;
                     } else {
-                        throw new Error(data.message || 'Terjadi kesalahan pada server.');
+                        // Jika API Key tidak valid, berikan fallback response
+                        if (data.message && (data.message.includes('API Key') || data.message.includes('belum aktif'))) {
+                            apiKeyValid = false;
+                            const fallbackMsg = `Maaf, fitur AI belum aktif. Namun saya bisa bantu dengan info dasar:\n\n` +
+                                `📧 Email: fauziamuhammad@apps.ipb.ac.id\n` +
+                                `📱 WhatsApp: 0821-2176-4347\n` +
+                                `💼 LinkedIn: linkedin.com/in/muhammad-fauzia-5b123034b\n\n` +
+                                `Muhammad Fauzia adalah mahasiswa D4 Teknologi Rekayasa Komputer IPB University yang berfokus pada IoT & Networking.`;
+                            addMessage(fallbackMsg, 'chat-ai');
+                        } else {
+                            throw new Error(data.message || 'Terjadi kesalahan pada server.');
+                        }
                     }
                 } catch(error) {
                     chatbotTyping.style.display = 'none';
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'chat-msg chat-ai';
                     errorDiv.style.color = '#c86b4d';
-                    errorDiv.textContent = error.message || "Maaf, server sedang offline. Silakan coba lagi nanti.";
+                    
+                    // Berikan pesan yang lebih helpful jika error
+                    if (error.message.includes('tidak dapat dijangkau') || error.message.includes('offline')) {
+                        errorDiv.innerHTML = `<strong>Server Offline</strong><br><br>` +
+                            `Hubungi langsung:<br>` +
+                            `📧 fauziamuhammad@apps.ipb.ac.id<br>` +
+                            `📱 <a href="https://wa.me/6282121764347" target="_blank" style="color:#25D366;">0821-2176-4347 (WhatsApp)</a>`;
+                    } else {
+                        errorDiv.textContent = error.message || "Maaf, server sedang offline. Silakan coba lagi nanti.";
+                    }
+                    
                     chatbotMessages.insertBefore(errorDiv, chatbotTyping);
                     console.error('Chatbot error:', error);
                 }
