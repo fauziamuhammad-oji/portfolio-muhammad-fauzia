@@ -168,11 +168,20 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey || apiKey.startsWith('GANTI_DENGAN')) {
+        if (!apiKey) {
             console.error('[CHATBOT ERROR] GEMINI_API_KEY tidak ditemukan di environment variables!');
             return res.status(500).json({ 
                 success: false, 
-                message: 'Fitur AI Chatbot belum aktif. API Key Gemini belum dikonfigurasi di server.' 
+                message: 'Fitur AI Chatbot belum aktif. Silakan hubungi admin untuk mengaktifkan API Key Gemini.' 
+            });
+        }
+
+        // Validasi format API Key Gemini (harus diawali AIza dan 39 karakter)
+        if (!apiKey.startsWith('AIza') || apiKey.length !== 39) {
+            console.error('[CHATBOT ERROR] Format GEMINI_API_KEY tidak valid! Harus diawali "AIza" dan 39 karakter.');
+            return res.status(500).json({ 
+                success: false, 
+                message: 'API Key Gemini tidak valid. Silakan periksa konfigurasi server.' 
             });
         }
 
