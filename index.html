@@ -2080,6 +2080,32 @@
             const chatbotTyping = document.getElementById('chatbotTyping');
 
             // Buka/Tutup Chat Panel
+            let isFirstMessage = true;
+
+            function getCurrentTime() {
+                const now = new Date();
+                return now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+
+            function addMessage(text, type) {
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.flexDirection = 'column';
+                wrapper.style.alignItems = type === 'chat-user' ? 'flex-end' : 'flex-start';
+
+                const bubble = document.createElement('div');
+                bubble.className = `chat-msg ${type}`;
+                bubble.textContent = text;
+
+                const timeEl = document.createElement('span');
+                timeEl.style.cssText = 'font-size:0.68rem; color:#999; margin-top:2px; padding: 0 4px;';
+                timeEl.textContent = getCurrentTime();
+
+                wrapper.appendChild(bubble);
+                wrapper.appendChild(timeEl);
+                chatbotMessages.insertBefore(wrapper, chatbotTyping);
+            }
+
             chatbotToggle.addEventListener('click', () => {
                 chatbotPanel.classList.toggle('active');
                 if(chatbotPanel.classList.contains('active')) {
@@ -2097,32 +2123,25 @@
                 if(!msgText) return;
 
                 // Tambahkan pesan user ke UI
-                const userMsgDiv = document.createElement('div');
-                userMsgDiv.className = 'chat-msg chat-user';
-                userMsgDiv.textContent = msgText;
-                chatbotMessages.insertBefore(userMsgDiv, chatbotTyping);
-                
+                addMessage(msgText, 'chat-user');
+
                 chatbotInput.value = '';
                 chatbotTyping.style.display = 'block';
                 chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
 
                 try {
-                    const response = await fetch('/api/chat', {
+                    const response = await fetch('http://localhost:3001/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: msgText })
+                        body: JSON.stringify({ message: msgText, isFirstMessage })
                     });
 
                     const data = await response.json();
                     chatbotTyping.style.display = 'none';
 
                     if(data.success) {
-                        const aiMsgDiv = document.createElement('div');
-                        aiMsgDiv.className = 'chat-msg chat-ai';
-                        // Format balasan Gemini (bold ** teks **) ke teks biasa agar aman 
-                        // atau biarkan teks biasa.
-                        aiMsgDiv.textContent = data.reply.replace(/\*\*/g, '');
-                        chatbotMessages.insertBefore(aiMsgDiv, chatbotTyping);
+                        addMessage(data.reply.replace(/\*\*/g, ''), 'chat-ai');
+                        isFirstMessage = false;
                     } else {
                         throw new Error(data.message || 'Error dari server');
                     }
@@ -2131,7 +2150,7 @@
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'chat-msg chat-ai';
                     errorDiv.style.color = '#c86b4d';
-                    errorDiv.textContent = "Maaf, API Key Gemini belum diatur atau server offline.";
+                    errorDiv.textContent = error.message || "Maaf, API Key Gemini belum diatur atau server offline.";
                     chatbotMessages.insertBefore(errorDiv, chatbotTyping);
                     console.error(error);
                 }
