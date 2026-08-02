@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 
@@ -162,6 +163,60 @@ app.post('/api/contact', async (req, res) => {
         return res.status(500).json({ 
             success: false, 
             message: 'Gagal mengirim email: ' + (error.message || 'Terjadi kesalahan server')
+        });
+    }
+});
+
+// ==========================================
+// Endpoint AI Chatbot (Gemini)
+// ==========================================
+app.post('/api/chat', async (req, res) => {
+    const { message } = req.body;
+
+    if (!message) {
+        return res.status(400).json({ success: false, message: 'Pesan tidak boleh kosong' });
+    }
+
+    try {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ success: false, message: 'API Key Gemini belum dikonfigurasi di server.' });
+        }
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        // System Prompt: Konteks tentang Muhammad Fauzia
+        const systemInstruction = `
+Kamu adalah asisten AI pribadi untuk portofolio Muhammad Fauzia.
+Tugas kamu adalah menjawab pertanyaan pengunjung tentang pengalaman, proyek, kemampuan, dan informasi lain terkait Muhammad Fauzia.
+
+Konteks tentang Muhammad Fauzia:
+- Nama: Muhammad Fauzia (sering dipanggil Fauzia atau Oji)
+- Keahlian: Internet of Things (IoT), Arduino, Node.js, HTML, CSS, JavaScript, Web Development.
+- Gaya komunikasi: Ramah, profesional, antusias, dan menggunakan bahasa Indonesia yang baik (boleh sedikit santai/modern).
+- Tujuan portofolio: Menampilkan proyek-proyek IoT, web, dan sertifikat untuk menarik perhatian recruiter atau klien.
+- Jika ditanya hal di luar portofolio atau tentang topik umum yang tidak ada hubungannya dengan IT/IoT/Fauzia, tolak secara halus dan arahkan kembali ke topik portofolio Fauzia.
+- Jangan pernah membagikan API key atau detail internal server.
+
+Jawab pertanyaan berikut dari pengunjung dengan singkat, padat, dan jelas:
+`;
+
+        const prompt = systemInstruction + "\nPertanyaan Pengunjung: " + message;
+        
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+
+        return res.status(200).json({
+            success: true,
+            reply: responseText
+        });
+
+    } catch (error) {
+        console.error('Error saat memanggil Gemini API:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Maaf, AI sedang mengalami gangguan. Silakan coba lagi nanti.'
         });
     }
 });
