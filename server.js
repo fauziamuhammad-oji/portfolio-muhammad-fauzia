@@ -183,17 +183,57 @@ const callAI = async (systemPrompt, userMessage) => {
                 { role: 'user',   content: userMessage  }
             ],
             max_tokens: 300,
-            temperature: 0.5
+            temperature: 0.5,
+            stream: false  // Paksa non-streaming agar response berupa JSON biasa
         })
     });
 
+    // Baca sebagai teks dulu — lebih aman dari pada langsung .json()
+    const rawText = await response.text();
+
     if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`9Router error ${response.status}: ${errText}`);
+        throw new Error(`9Router error ${response.status}: ${rawText.slice(0, 200)}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    // Coba parse sebagai JSON biasa dulu
+    let data;
+    try {
+        data = JSON.parse(rawText);
+    } catch (_) {
+        // Kalau gagal, kemungkinan response adalah SSE stream meski stream:false
+        // Ambil baris pertama yang berisi "data: {..." dan parse JSON-nya
+        const lines = rawText.split('\n');
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:') && !trimmed.includes('[DONE]')) {
+                const jsonStr = trimmed.replace(/^data:\s*/, '');
+                try {
+                    data = JSON.parse(jsonStr);
+                    break;
+                } catch (_) {
+                    continue;
+                }
+            }
+        }
+        if (!data) {
+            throw new Error(`Response tidak dapat di-parse. Raw: ${rawText.slice(0, 200)}`);
+        }
+    }
+
+    // Handle format streaming delta vs non-streaming message
+    const choice = data.choices?.[0];
+    if (!choice) {
+        throw new Error(`Response tidak memiliki choices. Raw: ${rawText.slice(0, 200)}`);
+    }
+
+    // Non-streaming: choices[0].message.content
+    // Streaming chunk: choices[0].delta.content
+    const content = choice.message?.content ?? choice.delta?.content ?? null;
+    if (content === null || content === undefined) {
+        throw new Error(`Tidak ada konten dalam response. Raw: ${rawText.slice(0, 200)}`);
+    }
+
+    return content;
 };
 
 // ==========================================
