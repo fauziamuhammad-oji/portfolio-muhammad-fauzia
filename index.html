@@ -174,9 +174,11 @@
 
         .typing-container { font-size: 1.3rem; font-weight: 400; min-height: 1.8rem; display: inline-block; }
         .typed-text { font-weight: 600; transition: color 0.3s ease; }
-        .color-0 { color: #00f2fe; text-shadow: 0 0 10px rgba(0,242,254,0.3); } 
-        .color-1 { color: #2ecc71; text-shadow: 0 0 10px rgba(46,204,113,0.3); } 
-        .color-2 { color: #ff7675; text-shadow: 0 0 10px rgba(255,118,117,0.3); } 
+        .color-0 { color: #ff4757; text-shadow: 0 0 12px rgba(255,71,87,0.6);   } /* Merah */
+        .color-1 { color: #a855f7; text-shadow: 0 0 12px rgba(168,85,247,0.6);  } /* Ungu */
+        .color-2 { color: #3b82f6; text-shadow: 0 0 12px rgba(59,130,246,0.6);  } /* Biru */
+        .color-3 { color: #ec4899; text-shadow: 0 0 12px rgba(236,72,153,0.6);  } /* Pink */
+        .color-4 { color: #67e8f9; text-shadow: 0 0 12px rgba(103,232,249,0.6); } /* Biru Ice */
 
         .cursor { display: inline-block; width: 2px; background-color: #dce9e8; margin-left: 3px; animation: blink 0.7s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
@@ -1698,7 +1700,7 @@
                 charIndex = isDeleting ? charIndex - 1 : charIndex + 1;
                 
                 if (!isDeleting && charIndex === currentWord.length) { isDeleting = true; setTimeout(type, 2000); }
-                else if (isDeleting && charIndex === 0) { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typedTextSpan.className = `typed-text color-${wordIndex}`; setTimeout(type, 500); }
+                else if (isDeleting && charIndex === 0) { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typedTextSpan.className = `typed-text color-${wordIndex % 5}`; setTimeout(type, 500); }
                 else { setTimeout(type, isDeleting ? 50 : 100); }
             }
             setTimeout(type, 1000);
