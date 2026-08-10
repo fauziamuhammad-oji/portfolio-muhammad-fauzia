@@ -3,6 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
+const path = require('path');
+const Database = require('better-sqlite3');
 
 const app = express();
 
@@ -10,11 +12,65 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ==========================================
+// SQLite — Setup Database Visitors
+// ==========================================
+const db = new Database(path.join(__dirname, 'visitors.db'));
+
+// Buat tabel jika belum ada
+db.exec(`
+    CREATE TABLE IF NOT EXISTS visitors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip TEXT,
+        page TEXT DEFAULT '/',
+        user_agent TEXT,
+        browser TEXT,
+        os TEXT,
+        device TEXT,
+        referrer TEXT,
+        visited_at DATETIME DEFAULT (datetime('now', 'localtime'))
+    );
+`);
+
+// Helper: parse browser & OS dari user-agent
+const parseUserAgent = (ua = '') => {
+    ua = ua.toLowerCase();
+    let browser = 'Other', os = 'Other', device = 'Desktop';
+
+    if (ua.includes('edg/'))           browser = 'Edge';
+    else if (ua.includes('opr/') || ua.includes('opera')) browser = 'Opera';
+    else if (ua.includes('chrome'))    browser = 'Chrome';
+    else if (ua.includes('firefox'))   browser = 'Firefox';
+    else if (ua.includes('safari'))    browser = 'Safari';
+
+    if (ua.includes('windows'))        os = 'Windows';
+    else if (ua.includes('android'))   os = 'Android';
+    else if (ua.includes('iphone') || ua.includes('ipad')) os = 'iOS';
+    else if (ua.includes('mac'))       os = 'MacOS';
+    else if (ua.includes('linux'))     os = 'Linux';
+
+    if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) device = 'Mobile';
+    else if (ua.includes('tablet') || ua.includes('ipad')) device = 'Tablet';
+
+    return { browser, os, device };
+};
+
+// Helper: get real IP dari request
+const getIP = (req) => {
+    return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+        || req.headers['x-real-ip']
+        || req.socket.remoteAddress
+        || 'unknown';
+};
+
+// ==========================================
 // Middleware Setup
 // ==========================================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve file statis (HTML, CSS, gambar, dll) — untuk test lokal tanpa Nginx
+app.use(express.static(path.join(__dirname)));
 
 // Helper untuk mendapatkan Transporter Nodemailer
 const getTransporter = () => {
@@ -56,6 +112,109 @@ app.get('/', (req, res) => {
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'Server berjalan', timestamp: new Date() });
+});
+
+// ==========================================
+// Endpoint Tracking Pengunjung
+// ==========================================
+app.post('/api/track', (req, res) => {
+    try {
+        const { page = '/', referrer = '' } = req.body;
+        const ip = getIP(req);
+        const ua = req.headers['user-agent'] || '';
+        const { browser, os, device } = parseUserAgent(ua);
+
+        db.prepare(`
+            INSERT INTO visitors (ip, page, user_agent, browser, os, device, referrer)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(ip, page, ua, browser, os, device, referrer);
+
+        return res.status(200).json({ success: true });
+    } catch (err) {
+        console.error('[TRACK ERROR]', err.message);
+        return res.status(500).json({ success: false });
+    }
+});
+
+// ==========================================
+// Middleware Auth Admin
+// ==========================================
+const adminAuth = (req, res, next) => {
+    const token = req.headers['x-admin-token'] || req.query.token;
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    if (token !== adminPassword) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    next();
+};
+
+// ==========================================
+// Endpoint Admin — Stats Analytics
+// ==========================================
+
+// GET /api/admin/stats — ringkasan statistik
+app.get('/api/admin/stats', adminAuth, (req, res) => {
+    const totalVisits     = db.prepare('SELECT COUNT(*) as count FROM visitors').get();
+    const uniqueVisitors  = db.prepare('SELECT COUNT(DISTINCT ip) as count FROM visitors').get();
+    const todayVisits     = db.prepare("SELECT COUNT(*) as count FROM visitors WHERE date(visited_at) = date('now','localtime')").get();
+    const weekVisits      = db.prepare("SELECT COUNT(*) as count FROM visitors WHERE visited_at >= datetime('now', '-7 days', 'localtime')").get();
+
+    const byBrowser = db.prepare(`
+        SELECT browser, COUNT(*) as count FROM visitors
+        GROUP BY browser ORDER BY count DESC LIMIT 6
+    `).all();
+
+    const byOS = db.prepare(`
+        SELECT os, COUNT(*) as count FROM visitors
+        GROUP BY os ORDER BY count DESC LIMIT 6
+    `).all();
+
+    const byDevice = db.prepare(`
+        SELECT device, COUNT(*) as count FROM visitors
+        GROUP BY device ORDER BY count DESC
+    `).all();
+
+    const byPage = db.prepare(`
+        SELECT page, COUNT(*) as count FROM visitors
+        GROUP BY page ORDER BY count DESC LIMIT 10
+    `).all();
+
+    // Data kunjungan 14 hari terakhir untuk grafik
+    const dailyVisits = db.prepare(`
+        SELECT date(visited_at) as date, COUNT(*) as count
+        FROM visitors
+        WHERE visited_at >= datetime('now', '-14 days', 'localtime')
+        GROUP BY date(visited_at)
+        ORDER BY date ASC
+    `).all();
+
+    // Kunjungan terbaru
+    const recentVisits = db.prepare(`
+        SELECT ip, page, browser, os, device, referrer, visited_at
+        FROM visitors ORDER BY id DESC LIMIT 20
+    `).all();
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            totalVisits:    totalVisits.count,
+            uniqueVisitors: uniqueVisitors.count,
+            todayVisits:    todayVisits.count,
+            weekVisits:     weekVisits.count,
+            byBrowser,
+            byOS,
+            byDevice,
+            byPage,
+            dailyVisits,
+            recentVisits
+        }
+    });
+});
+
+// DELETE /api/admin/clear — hapus semua data (opsional)
+app.delete('/api/admin/clear', adminAuth, (req, res) => {
+    db.prepare('DELETE FROM visitors').run();
+    return res.status(200).json({ success: true, message: 'Semua data visitor dihapus.' });
 });
 
 // Route POST untuk mengirim email dari form kontak

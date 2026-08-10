@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — Portofolio Fauzia</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0f1e;
+            --bg2: #0f1729;
+            --card: #131d35;
+            --card2: #1a2540;
+            --border: #1e2d4a;
+            --cyan: #00f2fe;
+            --purple: #a855f7;
+            --pink: #ec4899;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --text: #e2e8f0;
+            --muted: #64748b;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ===== LOGIN SCREEN ===== */
+        #loginScreen {
+            position: fixed; inset: 0; z-index: 999;
+            background: var(--bg);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 48px 40px;
+            width: 100%; max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(0,242,254,0.08);
+        }
+        .login-box .logo {
+            font-size: 2.5rem; margin-bottom: 8px;
+        }
+        .login-box h2 {
+            font-size: 1.4rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .login-box p {
+            color: var(--muted); font-size: 0.85rem; margin-bottom: 28px;
+        }
+        .login-box input {
+            width: 100%; padding: 12px 16px;
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text);
+            font-size: 1rem; margin-bottom: 14px;
+            outline: none; transition: border 0.2s;
+        }
+        .login-box input:focus { border-color: var(--cyan); }
+        .login-box button {
+            width: 100%; padding: 13px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            border: none; border-radius: 8px;
+            color: #000; font-weight: 700; font-size: 1rem;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        .login-box button:hover { opacity: 0.9; }
+        .login-error {
+            color: var(--red); font-size: 0.85rem;
+            margin-top: 10px; display: none;
+        }
+
+        /* ===== MAIN DASHBOARD ===== */
+        #dashboard { display: none; }
+
+        /* Header */
+        .header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-left .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .header-left h1 { font-size: 1.1rem; font-weight: 700; }
+        .header-left span { color: var(--muted); font-size: 0.8rem; }
+        .header-right { display: flex; gap: 10px; align-items: center; }
+        .btn-refresh {
+            padding: 8px 16px; background: var(--card2);
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--cyan); font-size: 0.85rem; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-refresh:hover { background: var(--border); }
+        .btn-logout {
+            padding: 8px 16px; background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3); border-radius: 8px;
+            color: var(--red); font-size: 0.85rem; cursor: pointer;
+        }
+        .btn-logout:hover { background: rgba(239,68,68,0.2); }
+
+        /* Main Content */
+        .main { padding: 28px; max-width: 1400px; margin: 0 auto; }
+
+        /* Stat Cards */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px; margin-bottom: 24px;
+        }
+        @media(max-width:900px){ .stat-grid{ grid-template-columns: repeat(2,1fr); } }
+        @media(max-width:500px){ .stat-grid{ grid-template-columns: 1fr; } }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px 22px;
+            position: relative; overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+        }
+        .stat-card.cyan::before  { background: var(--cyan); }
+        .stat-card.purple::before{ background: var(--purple); }
+        .stat-card.green::before { background: var(--green); }
+        .stat-card.yellow::before{ background: var(--yellow); }
+
+        .stat-icon { font-size: 1.8rem; margin-bottom: 10px; }
+        .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .stat-value { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+        .stat-card.cyan  .stat-value { color: var(--cyan); }
+        .stat-card.purple .stat-value { color: var(--purple); }
+        .stat-card.green  .stat-value { color: var(--green); }
+        .stat-card.yellow .stat-value { color: var(--yellow); }
+        .stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px; margin-bottom: 24px;
+        }
+        @media(max-width:900px){ .charts-grid{ grid-template-columns: 1fr; } }
+
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px; padding: 22px;
+        }
+        .chart-title {
+            font-size: 0.9rem; font-weight: 600;
+            color: var(--text); margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .chart-title span { color: var(--muted); font-weight: 400; }
+
+        /* Pie Charts Row */
+        .pie-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px; margin-bottom: 24px;
+        }
+        @media(max-width:900px){ .pie-grid{ grid-template-columns: 1fr; } }
+
+        .pie-chart-wrap { position: relative; height: 180px; }
+
+        /* Recent Visitors Table */
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden;
+        }
+        .table-header {
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .table-header h3 { font-size: 0.9rem; font-weight: 600; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        thead th {
+            padding: 10px 16px; text-align: left;
+            color: var(--muted); font-weight: 600;
+            font-size: 0.75rem; text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg2);
+        }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+        tbody tr:hover { background: var(--card2); }
+        tbody tr:last-child { border-bottom: none; }
+        tbody td { padding: 10px 16px; color: var(--text); vertical-align: middle; }
+        .badge {
+            display: inline-block; padding: 2px 8px;
+            border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+        }
+        .badge-desktop { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .badge-mobile  { background: rgba(168,85,247,0.15); color: var(--purple); }
+        .badge-tablet  { background: rgba(245,158,11,0.15); color: var(--yellow); }
+        .ip-text { font-family: monospace; color: var(--muted); font-size: 0.75rem; }
+        .page-text { color: var(--cyan); }
+        .time-text { color: var(--muted); font-size: 0.75rem; }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: var(--muted);
+        }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+        /* Loading */
+        .loading {
+            text-align: center; padding: 40px; color: var(--muted);
+        }
+        .spinner {
+            display: inline-block; width: 32px; height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Last updated */
+        .last-updated {
+            text-align: right; color: var(--muted);
+            font-size: 0.75rem; margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="logo">🛡️</div>
+        <h2>Admin Dashboard</h2>
+        <p>Portofolio Muhammad Fauzia</p>
+        <input type="password" id="passwordInput" placeholder="Masukkan password admin" />
+        <button onclick="doLogin()">Masuk</button>
+        <div class="login-error" id="loginError">Password salah. Coba lagi.</div>
+    </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="dashboard">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="dot"></div>
+            <div>
+                <h1>Analytics Dashboard</h1>
+                <span>Portofolio Muhammad Fauzia</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn-refresh" onclick="loadStats()">⟳ Refresh</button>
+            <button class="btn-logout" onclick="doLogout()">Keluar</button>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="last-updated" id="lastUpdated"></div>
+
+        <!-- Stat Cards -->
+        <div class="stat-grid">
+            <div class="stat-card cyan">
+                <div class="stat-icon">👁️</div>
+                <div class="stat-label">Total Kunjungan</div>
+                <div class="stat-value" id="statTotal">—</div>
+                <div class="stat-sub">Semua waktu</div>
+            </div>
+            <div class="stat-card purple">
+                <div class="stat-icon">👤</div>
+                <div class="stat-label">Pengunjung Unik</div>
+                <div class="stat-value" id="statUnique">—</div>
+                <div class="stat-sub">Berdasarkan IP</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-icon">📅</div>
+                <div class="stat-label">Hari Ini</div>
+                <div class="stat-value" id="statToday">—</div>
+                <div class="stat-sub">Kunjungan hari ini</div>
+            </div>
+            <div class="stat-card yellow">
+                <div class="stat-icon">📊</div>
+                <div class="stat-label">7 Hari Terakhir</div>
+                <div class="stat-value" id="statWeek">—</div>
+                <div class="stat-sub">Kunjungan minggu ini</div>
+            </div>
+        </div>
+
+        <!-- Line Chart + Top Pages -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">📈 Kunjungan 14 Hari Terakhir <span id="chartSubtitle"></span></div>
+                <canvas id="lineChart" height="100"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🔗 Halaman Terpopuler</div>
+                <canvas id="pageChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Pie Charts -->
+        <div class="pie-grid">
+            <div class="chart-card">
+                <div class="chart-title">🌐 Browser</div>
+                <div class="pie-chart-wrap"><canvas id="browserChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">💻 Sistem Operasi</div>
+                <div class="pie-chart-wrap"><canvas id="osChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📱 Perangkat</div>
+                <div class="pie-chart-wrap"><canvas id="deviceChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Recent Visitors Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h3>🕐 Kunjungan Terbaru</h3>
+                <span style="color:var(--muted);font-size:0.8rem;">20 terakhir</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Halaman</th>
+                            <th>Browser</th>
+                            <th>OS</th>
+                            <th>Perangkat</th>
+                            <th>Referrer</th>
+                            <th>Waktu</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentTable">
+                        <tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== AUTH =====
+    let adminToken = sessionStorage.getItem('adminToken') || '';
+
+    function doLogin() {
+        const pw = document.getElementById('passwordInput').value.trim();
+        if (!pw) return;
+        adminToken = pw;
+        sessionStorage.setItem('adminToken', pw);
+        loadStats();
+    }
+
+    document.getElementById('passwordInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+    });
+
+    function doLogout() {
+        adminToken = '';
+        sessionStorage.removeItem('adminToken');
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('passwordInput').value = '';
+    }
+
+    // ===== CHART INSTANCES =====
+    const charts = {};
+
+    function destroyChart(id) {
+        if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    }
+
+    const COLORS = ['#00f2fe','#a855f7','#ec4899','#10b981','#f59e0b','#ef4444','#3b82f6','#f97316'];
+
+    // ===== LOAD STATS =====
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/admin/stats', {
+                headers: { 'x-admin-token': adminToken }
+            });
+
+            if (res.status === 401) {
+                document.getElementById('loginError').style.display = 'block';
+                document.getElementById('loginError').textContent = 'Password salah. Coba lagi.';
+                adminToken = '';
+                sessionStorage.removeItem('adminToken');
+                return;
+            }
+
+            const json = await res.json();
+            if (!json.success) return;
+
+            const d = json.data;
+
+            // Tampilkan dashboard
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('loginError').style.display = 'none';
+
+            // Stat cards
+            document.getElementById('statTotal').textContent  = d.totalVisits.toLocaleString('id');
+            document.getElementById('statUnique').textContent = d.uniqueVisitors.toLocaleString('id');
+            document.getElementById('statToday').textContent  = d.todayVisits.toLocaleString('id');
+            document.getElementById('statWeek').textContent   = d.weekVisits.toLocaleString('id');
+
+            // Last updated
+            document.getElementById('lastUpdated').textContent =
+                'Terakhir diperbarui: ' + new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+
+            // Line Chart — kunjungan harian
+            renderLineChart(d.dailyVisits);
+
+            // Bar Chart — halaman terpopuler
+            renderPageChart(d.byPage);
+
+            // Pie Charts
+            renderPieChart('browserChart', d.byBrowser, 'browser');
+            renderPieChart('osChart', d.byOS, 'os');
+            renderPieChart('deviceChart', d.byDevice, 'device');
+
+            // Tabel kunjungan terbaru
+            renderTable(d.recentVisits);
+
+        } catch (err) {
+            console.error('Error loading stats:', err);
+        }
+    }
+
+    // ===== RENDER CHARTS =====
+
+    function renderLineChart(data) {
+        destroyChart('lineChart');
+        const ctx = document.getElementById('lineChart').getContext('2d');
+
+        // Isi hari yang tidak ada data dengan 0
+        const today = new Date();
+        const labels = [], values = [];
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const found = data.find(r => r.date === dateStr);
+            labels.push(d.toLocaleDateString('id-ID', { day:'numeric', month:'short' }));
+            values.push(found ? found.count : 0);
+        }
+
+        charts['lineChart'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Kunjungan',
+                    data: values,
+                    borderColor: '#00f2fe',
+                    backgroundColor: 'rgba(0,242,254,0.08)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00f2fe',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', font: { size: 11 } } },
+                    y: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', stepSize: 1 }, beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    function renderPageChart(data) {
+        destroyChart('pageChart');
+        if (!data.length) return;
+        const ctx = document.getElementById('pageChart').getContext('2d');
+        charts['pageChart'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(r => r.page || '/'),
+                datasets: [{
+                    label: 'Kunjungan',
+                    data: data.map(r => r.count),
+                    backgroundColor: data.map((_, i) => COLORS[i % COLORS.length] + '99'),
+                    borderColor: data.map((_, i) => COLORS[i % COLORS.length]),
+                    borderWidth: 1, borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' }, beginAtZero: true },
+                    y: { grid: { display: false }, ticks: { color: '#e2e8f0', font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    function renderPieChart(canvasId, data, key) {
+        destroyChart(canvasId);
+        if (!data.length) return;
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        charts[canvasId] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.map(r => r[key]),
+                datasets: [{
+                    data: data.map(r => r.count),
+                    backgroundColor: COLORS.slice(0, data.length),
+                    borderColor: '#131d35',
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#94a3b8', font: { size: 11 }, padding: 10, boxWidth: 12 }
+                    }
+                }
+            }
+        });
+    }
+
+    // ===== RENDER TABLE =====
+    function renderTable(rows) {
+        const tbody = document.getElementById('recentTable');
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><div>Belum ada data pengunjung</div></div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map(r => {
+            const badgeClass = r.device === 'Mobile' ? 'badge-mobile' : r.device === 'Tablet' ? 'badge-tablet' : 'badge-desktop';
+            const ref = r.referrer ? `<span style="color:var(--muted);font-size:0.75rem">${r.referrer.slice(0,30)}</span>` : '<span style="color:var(--muted)">—</span>';
+            const time = new Date(r.visited_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+            return `<tr>
+                <td><span class="ip-text">${r.ip}</span></td>
+                <td><span class="page-text">${r.page || '/'}</span></td>
+                <td>${r.browser || '—'}</td>
+                <td>${r.os || '—'}</td>
+                <td><span class="badge ${badgeClass}">${r.device || '—'}</span></td>
+                <td>${ref}</td>
+                <td><span class="time-text">${time}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ===== INIT — auto login jika sudah ada token =====
+    if (adminToken) {
+        loadStats();
+    }
+
+    // Auto refresh setiap 60 detik
+    setInterval(() => {
+        if (adminToken && document.getElementById('dashboard').style.display !== 'none') {
+            loadStats();
+        }
+    }, 60000);
+</script>
+</body>
+</html>
