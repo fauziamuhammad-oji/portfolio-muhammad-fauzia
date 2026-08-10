@@ -192,7 +192,7 @@ app.post('/api/track', (req, res) => {
 // ==========================================
 const adminAuth = (req, res, next) => {
     const token = req.headers['x-admin-token'] || req.query.token;
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'fauzia2026';
     if (token !== adminPassword) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
