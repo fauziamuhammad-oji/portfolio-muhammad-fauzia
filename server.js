@@ -4,7 +4,8 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const path = require('path');
-const Database = require('better-sqlite3');
+const fs = require('fs');
+const initSqlJs = require('sql.js');
 
 const app = express();
 
@@ -12,25 +13,73 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ==========================================
-// SQLite — Setup Database Visitors
+// SQLite (sql.js) — Setup Database Visitors
+// Pure JS, tidak butuh Python/node-gyp
 // ==========================================
-const dbDir = process.env.DB_PATH || __dirname;
-const db = new Database(path.join(dbDir, 'visitors.db'));
+const DB_FILE = path.join(__dirname, 'visitors.db');
+let db;
 
-// Buat tabel jika belum ada
-db.exec(`
-    CREATE TABLE IF NOT EXISTS visitors (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip TEXT,
-        page TEXT DEFAULT '/',
-        user_agent TEXT,
-        browser TEXT,
-        os TEXT,
-        device TEXT,
-        referrer TEXT,
-        visited_at DATETIME DEFAULT (datetime('now', 'localtime'))
-    );
-`);
+// Inisialisasi database — load dari file jika ada, buat baru jika belum
+const initDB = async () => {
+    const SQL = await initSqlJs();
+
+    if (fs.existsSync(DB_FILE)) {
+        const fileBuffer = fs.readFileSync(DB_FILE);
+        db = new SQL.Database(fileBuffer);
+    } else {
+        db = new SQL.Database();
+    }
+
+    // Buat tabel jika belum ada
+    db.run(`
+        CREATE TABLE IF NOT EXISTS visitors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT,
+            page TEXT DEFAULT '/',
+            user_agent TEXT,
+            browser TEXT,
+            os TEXT,
+            device TEXT,
+            referrer TEXT,
+            visited_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
+        );
+    `);
+
+    saveDB();
+    console.log('[DB] Database visitors siap.');
+};
+
+// Simpan database ke file
+const saveDB = () => {
+    try {
+        const data = db.export();
+        fs.writeFileSync(DB_FILE, Buffer.from(data));
+    } catch (e) {
+        console.error('[DB] Gagal menyimpan database:', e.message);
+    }
+};
+
+// Helper: jalankan query dan auto-save
+const dbRun = (sql, params = []) => {
+    db.run(sql, params);
+    saveDB();
+};
+
+// Helper: query dan return semua baris
+const dbAll = (sql, params = []) => {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    stmt.free();
+    return rows;
+};
+
+// Helper: query dan return satu baris
+const dbGet = (sql, params = []) => {
+    const rows = dbAll(sql, params);
+    return rows[0] || null;
+};
 
 // Helper: parse browser & OS dari user-agent
 const parseUserAgent = (ua = '') => {
