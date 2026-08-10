@@ -14,7 +14,8 @@ const PORT = process.env.PORT || 3001;
 // ==========================================
 // SQLite — Setup Database Visitors
 // ==========================================
-const db = new Database(path.join(__dirname, 'visitors.db'));
+const dbDir = process.env.DB_PATH || __dirname;
+const db = new Database(path.join(dbDir, 'visitors.db'));
 
 // Buat tabel jika belum ada
 db.exec(`
