@@ -23,3 +23,6 @@ dist/
 build/
 *.log
 CARA-DAPAT-GEMINI-API-KEY.md
+
+# Database lokal — jangan commit ke Git
+visitors.db
