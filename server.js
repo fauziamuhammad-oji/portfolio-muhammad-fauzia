@@ -174,10 +174,11 @@ app.post('/api/track', (req, res) => {
         const ua = req.headers['user-agent'] || '';
         const { browser, os, device } = parseUserAgent(ua);
 
-        db.prepare(`
-            INSERT INTO visitors (ip, page, user_agent, browser, os, device, referrer)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(ip, page, ua, browser, os, device, referrer);
+        dbRun(
+            `INSERT INTO visitors (ip, page, user_agent, browser, os, device, referrer)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [ip, page, ua, browser, os, device, referrer]
+        );
 
         return res.status(200).json({ success: true });
     } catch (err) {
@@ -204,53 +205,36 @@ const adminAuth = (req, res, next) => {
 
 // GET /api/admin/stats — ringkasan statistik
 app.get('/api/admin/stats', adminAuth, (req, res) => {
-    const totalVisits     = db.prepare('SELECT COUNT(*) as count FROM visitors').get();
-    const uniqueVisitors  = db.prepare('SELECT COUNT(DISTINCT ip) as count FROM visitors').get();
-    const todayVisits     = db.prepare("SELECT COUNT(*) as count FROM visitors WHERE date(visited_at) = date('now','localtime')").get();
-    const weekVisits      = db.prepare("SELECT COUNT(*) as count FROM visitors WHERE visited_at >= datetime('now', '-7 days', 'localtime')").get();
+    const totalVisits    = dbGet('SELECT COUNT(*) as count FROM visitors');
+    const uniqueVisitors = dbGet('SELECT COUNT(DISTINCT ip) as count FROM visitors');
+    const todayVisits    = dbGet("SELECT COUNT(*) as count FROM visitors WHERE date(visited_at) = date('now','localtime')");
+    const weekVisits     = dbGet("SELECT COUNT(*) as count FROM visitors WHERE visited_at >= datetime('now', '-7 days', 'localtime')");
 
-    const byBrowser = db.prepare(`
-        SELECT browser, COUNT(*) as count FROM visitors
-        GROUP BY browser ORDER BY count DESC LIMIT 6
-    `).all();
+    const byBrowser = dbAll(`SELECT browser, COUNT(*) as count FROM visitors GROUP BY browser ORDER BY count DESC LIMIT 6`);
+    const byOS      = dbAll(`SELECT os, COUNT(*) as count FROM visitors GROUP BY os ORDER BY count DESC LIMIT 6`);
+    const byDevice  = dbAll(`SELECT device, COUNT(*) as count FROM visitors GROUP BY device ORDER BY count DESC`);
+    const byPage    = dbAll(`SELECT page, COUNT(*) as count FROM visitors GROUP BY page ORDER BY count DESC LIMIT 10`);
 
-    const byOS = db.prepare(`
-        SELECT os, COUNT(*) as count FROM visitors
-        GROUP BY os ORDER BY count DESC LIMIT 6
-    `).all();
-
-    const byDevice = db.prepare(`
-        SELECT device, COUNT(*) as count FROM visitors
-        GROUP BY device ORDER BY count DESC
-    `).all();
-
-    const byPage = db.prepare(`
-        SELECT page, COUNT(*) as count FROM visitors
-        GROUP BY page ORDER BY count DESC LIMIT 10
-    `).all();
-
-    // Data kunjungan 14 hari terakhir untuk grafik
-    const dailyVisits = db.prepare(`
+    const dailyVisits = dbAll(`
         SELECT date(visited_at) as date, COUNT(*) as count
         FROM visitors
         WHERE visited_at >= datetime('now', '-14 days', 'localtime')
         GROUP BY date(visited_at)
         ORDER BY date ASC
-    `).all();
+    `);
 
-    // Kunjungan terbaru
-    const recentVisits = db.prepare(`
+    const recentVisits = dbAll(`
         SELECT ip, page, browser, os, device, referrer, visited_at
         FROM visitors ORDER BY id DESC LIMIT 20
-    `).all();
+    `);
 
     return res.status(200).json({
         success: true,
         data: {
-            totalVisits:    totalVisits.count,
-            uniqueVisitors: uniqueVisitors.count,
-            todayVisits:    todayVisits.count,
-            weekVisits:     weekVisits.count,
+            totalVisits:    totalVisits?.count || 0,
+            uniqueVisitors: uniqueVisitors?.count || 0,
+            todayVisits:    todayVisits?.count || 0,
+            weekVisits:     weekVisits?.count || 0,
             byBrowser,
             byOS,
             byDevice,
@@ -261,9 +245,9 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
     });
 });
 
-// DELETE /api/admin/clear — hapus semua data (opsional)
+// DELETE /api/admin/clear — hapus semua data
 app.delete('/api/admin/clear', adminAuth, (req, res) => {
-    db.prepare('DELETE FROM visitors').run();
+    dbRun('DELETE FROM visitors');
     return res.status(200).json({ success: true, message: 'Semua data visitor dihapus.' });
 });
 
@@ -534,15 +518,24 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// Export & Local Listener (Vercel Compatibility)
+// Export & Local Listener
 // ==========================================
-
-// Hanya jalankan listener jika diuji secara lokal (bukan Vercel Serverless)
 if (require.main === module) {
-    app.listen(PORT, () => {
-        console.log(`Server lokal berjalan di port ${PORT}`);
+    initDB().then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server lokal berjalan di port ${PORT}`);
+            console.log(`Admin dashboard: http://localhost:${PORT}/admin.html`);
+        });
+    }).catch(err => {
+        console.error('Gagal inisialisasi database:', err);
+        process.exit(1);
     });
 }
 
-// ⚠️ WAJIB UNTUK VERCEL: Export app Express
-module.exports = app;
+// Export untuk Vercel
+const serverExport = async (req, res) => {
+    if (!db) await initDB();
+    app(req, res);
+};
+
+module.exports = serverExport;
